@@ -1,103 +1,101 @@
-import Image from "next/image";
+'use client';
 
-export default function Home() {
+import React, { useEffect, useState, useCallback } from 'react';
+
+type Note = { id: number; title: string; content?: string | null; created_at?: string };
+
+export default function HomePage() {
+  const [notes, setNotes] = useState<Note[]>([]);
+  const [title, setTitle] = useState('');
+  const [content, setContent] = useState('');
+  const [editing, setEditing] = useState<Note | null>(null);
+  const apiBase = process.env.NEXT_PUBLIC_API_BASE || '/api';
+
+  const fetchNotes = useCallback(async () => {
+    const res = await fetch(`${apiBase}/notes`);
+    const data = await res.json();
+    if (data.success) setNotes(data.data || []);
+  }, [apiBase]);
+
+  useEffect(() => {
+    fetchNotes();
+  }, [fetchNotes]);
+
+  async function handleCreate(e: React.FormEvent) {
+    e.preventDefault();
+    if (!title.trim()) return alert('Title required');
+    const res = await fetch(`${apiBase}/notes`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title, content }),
+    });
+    const data = await res.json();
+    if (data.success) {
+      setTitle('');
+      setContent('');
+      setNotes(prev => [data.data, ...prev]);
+    } else alert(data.error || 'Error');
+  }
+
+  async function handleDelete(id: number) {
+    if (!confirm('Are you sure?')) return;
+    await fetch(`${apiBase}/notes?id=${id}`, { method: 'DELETE' });
+    setNotes(prev => prev.filter(n => n.id !== id));
+  }
+
+  function startEdit(note: Note) {
+    setEditing(note);
+    setTitle(note.title);
+    setContent(note.content || '');
+  }
+
+  async function submitEdit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editing) return;
+    const res = await fetch(`${apiBase}/notes`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: editing.id, title, content }),
+    });
+    const data = await res.json();
+    if (data.success) {
+      setNotes(prev => prev.map(n => (n.id === data.data.id ? data.data : n)));
+      setEditing(null);
+      setTitle('');
+      setContent('');
+    } else alert(data.error || 'Error');
+  }
+
   return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+    <div className="p-6 max-w-3xl mx-auto">
+      <h1 className="text-2xl font-bold mb-4">Notes CRUD (Next.js + MySQL)</h1>
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+      <form onSubmit={editing ? submitEdit : handleCreate} className="mb-6">
+        <input value={title} onChange={e => setTitle(e.target.value)} placeholder="Title" className="w-full p-2 border mb-2" />
+        <textarea value={content} onChange={e => setContent(e.target.value)} placeholder="Content" className="w-full p-2 border mb-2" />
+        <div>
+          <button type="submit" className="px-3 py-1 mr-2 border rounded">{editing ? 'Update' : 'Create'}</button>
+          {editing && (
+            <button type="button" onClick={() => { setEditing(null); setTitle(''); setContent(''); }} className="px-3 py-1 border rounded">Cancel</button>
+          )}
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+      </form>
+
+      <ul>
+        {notes.map(n => (
+          <li key={n.id} className="mb-3 p-3 border rounded">
+            <div className="flex justify-between">
+              <strong>{n.title}</strong>
+              <div>
+                <button onClick={() => startEdit(n)} className="mr-2">Edit</button>
+                <button onClick={() => handleDelete(n.id)}>Delete</button>
+              </div>
+            </div>
+            {n.content && <p className="mt-2">{n.content}</p>}
+            <small className="text-gray-500">{n.created_at}</small>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
